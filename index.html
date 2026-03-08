@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DevDock - Local Dev Environment Manager for macOS</title>
+    <meta name="description" content="DevDock is a macOS Electron app that manages your local development projects, embedded Claude Code sessions, autonomous pipelines, and agent monitoring from one unified dashboard.">
+    <style>
+        :root {
+            --bg: #0d1117;
+            --bg-card: #161b22;
+            --bg-secondary: #21262d;
+            --border: #30363d;
+            --text: #e6edf3;
+            --text-secondary: #8b949e;
+            --text-muted: #6e7681;
+            --accent: #58a6ff;
+            --accent-hover: #79c0ff;
+            --green: #3fb950;
+            --orange: #d29922;
+            --purple: #bc8cff;
+            --red: #f85149;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        /* Header / Nav */
+        .nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 100;
+            padding: 12px 32px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: rgba(13, 17, 23, 0.85);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border);
+        }
+        .nav-logo { width: 32px; height: 32px; }
+        .nav-title { font-size: 16px; font-weight: 700; }
+        .nav-links { margin-left: auto; display: flex; gap: 24px; }
+        .nav-links a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 14px;
+            transition: color 0.2s;
+        }
+        .nav-links a:hover { color: var(--text); }
+
+        /* Hero */
+        .hero {
+            padding: 140px 32px 80px;
+            text-align: center;
+            max-width: 900px;
+            margin: 0 auto;
+            position: relative;
+        }
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: 60px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 600px;
+            height: 400px;
+            background: radial-gradient(ellipse at center, rgba(88,166,255,0.08) 0%, transparent 70%);
+            pointer-events: none;
+        }
+        .hero-icon {
+            width: 96px;
+            height: 96px;
+            margin-bottom: 24px;
+        }
+        .hero h1 {
+            font-size: 52px;
+            font-weight: 800;
+            letter-spacing: -1.5px;
+            line-height: 1.1;
+            margin-bottom: 16px;
+        }
+        .hero h1 .accent { color: var(--accent); }
+        .hero .subtitle {
+            font-size: 20px;
+            color: var(--text-secondary);
+            max-width: 640px;
+            margin: 0 auto 32px;
+            line-height: 1.5;
+        }
+        .hero-badges {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-bottom: 40px;
+        }
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+        }
+        .badge-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+        }
+        .badge-dot.blue { background: var(--accent); }
+        .badge-dot.green { background: var(--green); }
+        .badge-dot.purple { background: var(--purple); }
+        .badge-dot.orange { background: var(--orange); }
+
+        /* App Screenshot Mockup */
+        .screenshot-container {
+            max-width: 1000px;
+            margin: 0 auto 80px;
+            padding: 0 32px;
+        }
+        .app-mockup {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 24px 80px rgba(0,0,0,0.5), 0 0 0 1px rgba(88,166,255,0.05);
+        }
+        .mockup-titlebar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 16px;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+        }
+        .mockup-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+        .mockup-dot.r { background: #f85149; }
+        .mockup-dot.y { background: #d29922; }
+        .mockup-dot.g { background: #3fb950; }
+        .mockup-title {
+            margin-left: 8px;
+            font-size: 12px;
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+        .mockup-tabs {
+            display: flex;
+            gap: 0;
+            padding: 0 16px;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+        }
+        .mockup-tab {
+            padding: 8px 16px;
+            font-size: 12px;
+            color: var(--text-muted);
+            border-bottom: 2px solid transparent;
+        }
+        .mockup-tab.active {
+            color: var(--text);
+            border-bottom-color: var(--accent);
+        }
+        .mockup-body {
+            display: flex;
+            min-height: 360px;
+        }
+        .mockup-sidebar {
+            width: 180px;
+            padding: 12px;
+            border-right: 1px solid var(--border);
+            flex-shrink: 0;
+        }
+        .mockup-sidebar-item {
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            color: var(--text-secondary);
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 2px;
+        }
+        .mockup-sidebar-item.active {
+            background: var(--bg-secondary);
+            color: var(--text);
+        }
+        .mockup-sidebar-title {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-muted);
+            padding: 8px 10px 4px;
+        }
+        .mockup-grid {
+            flex: 1;
+            padding: 16px;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            align-content: start;
+        }
+        .mockup-card {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 12px;
+        }
+        .mockup-card-header {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 6px;
+        }
+        .mockup-card-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+        }
+        .mockup-card-name {
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .mockup-card-desc {
+            font-size: 10px;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+        }
+        .mockup-card-tags {
+            display: flex;
+            gap: 4px;
+            flex-wrap: wrap;
+        }
+        .mockup-tag {
+            font-size: 9px;
+            padding: 2px 6px;
+            border-radius: 10px;
+            background: rgba(88,166,255,0.1);
+            color: var(--accent);
+        }
+        .mockup-tag.green { background: rgba(63,185,80,0.1); color: var(--green); }
+        .mockup-tag.purple { background: rgba(188,140,255,0.1); color: var(--purple); }
+
+        /* Features Section */
+        .features {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 0 32px 80px;
+        }
+        .features-title {
+            text-align: center;
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 48px;
+        }
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+        }
+        .feature-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 28px;
+            transition: border-color 0.2s;
+        }
+        .feature-card:hover {
+            border-color: var(--accent);
+        }
+        .feature-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            margin-bottom: 16px;
+        }
+        .feature-icon.blue { background: rgba(88,166,255,0.12); }
+        .feature-icon.green { background: rgba(63,185,80,0.12); }
+        .feature-icon.purple { background: rgba(188,140,255,0.12); }
+        .feature-icon.orange { background: rgba(210,153,34,0.12); }
+        .feature-card h3 {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+        .feature-card p {
+            font-size: 14px;
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+
+        /* Terminal Mockup Section */
+        .terminal-section {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 0 32px 80px;
+        }
+        .terminal-section-title {
+            text-align: center;
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 12px;
+        }
+        .terminal-section-sub {
+            text-align: center;
+            color: var(--text-secondary);
+            margin-bottom: 40px;
+            font-size: 16px;
+        }
+        .terminal-mockup {
+            background: #0d1117;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        .terminal-bar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 16px;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+        }
+        .terminal-bar-tab {
+            padding: 4px 12px;
+            font-size: 11px;
+            border-radius: 4px;
+            color: var(--text-muted);
+        }
+        .terminal-bar-tab.active {
+            background: var(--bg);
+            color: var(--text);
+        }
+        .terminal-bar-tab .tab-dot {
+            display: inline-block;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--orange);
+            margin-left: 6px;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+        .terminal-content {
+            padding: 16px;
+            font-family: 'SF Mono', 'Menlo', 'Consolas', monospace;
+            font-size: 12px;
+            line-height: 1.7;
+            min-height: 200px;
+        }
+        .terminal-content .prompt { color: var(--accent); }
+        .terminal-content .output { color: var(--text-secondary); }
+        .terminal-content .success { color: var(--green); }
+        .terminal-content .claude { color: var(--purple); }
+
+        /* Agent Section */
+        .agent-section {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 0 32px 80px;
+        }
+        .agent-cards {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-top: 40px;
+        }
+        .agent-card-mock {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px;
+        }
+        .agent-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+        .agent-dot-mock {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+        .agent-dot-mock.on { background: var(--green); box-shadow: 0 0 6px var(--green); }
+        .agent-dot-mock.off { background: var(--text-muted); }
+        .agent-name-mock { font-size: 13px; font-weight: 600; }
+        .agent-badge-mock {
+            margin-left: auto;
+            font-size: 9px;
+            padding: 2px 8px;
+            border-radius: 10px;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+        .agent-badge-mock.running { background: rgba(63,185,80,0.15); color: var(--green); }
+        .agent-badge-mock.idle { background: rgba(110,118,129,0.15); color: var(--text-muted); }
+        .agent-desc-mock { font-size: 11px; color: var(--text-secondary); margin-bottom: 8px; }
+        .agent-meta-mock { font-size: 10px; color: var(--text-muted); }
+
+        /* Pipeline Section */
+        .pipeline-dots {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0;
+            margin: 40px 0;
+        }
+        .pipeline-dot {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 13px;
+            font-weight: 600;
+            border: 2px solid var(--border);
+            color: var(--text-muted);
+            background: var(--bg-card);
+        }
+        .pipeline-dot.done { border-color: var(--green); color: var(--green); background: rgba(63,185,80,0.08); }
+        .pipeline-dot.active { border-color: var(--accent); color: var(--accent); background: rgba(88,166,255,0.08); animation: pulse 1.5s ease-in-out infinite; }
+        .pipeline-line {
+            width: 60px;
+            height: 2px;
+            background: var(--border);
+        }
+        .pipeline-line.done { background: var(--green); }
+        .pipeline-labels {
+            display: flex;
+            justify-content: center;
+            gap: 48px;
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        /* Tech Stack */
+        .tech-section {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 0 32px 80px;
+            text-align: center;
+        }
+        .tech-grid {
+            display: flex;
+            justify-content: center;
+            gap: 16px;
+            flex-wrap: wrap;
+            margin-top: 32px;
+        }
+        .tech-item {
+            padding: 10px 20px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 40px 32px;
+            border-top: 1px solid var(--border);
+            color: var(--text-muted);
+            font-size: 13px;
+        }
+        .footer a { color: var(--accent); text-decoration: none; }
+        .footer a:hover { text-decoration: underline; }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .hero h1 { font-size: 36px; }
+            .hero .subtitle { font-size: 16px; }
+            .features-grid { grid-template-columns: 1fr; }
+            .mockup-grid { grid-template-columns: repeat(2, 1fr); }
+            .mockup-sidebar { display: none; }
+            .agent-cards { grid-template-columns: 1fr; }
+            .pipeline-line { width: 30px; }
+        }
+
+        @media (max-width: 480px) {
+            .mockup-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- Nav -->
+<nav class="nav">
+    <svg class="nav-logo" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+            <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" style="stop-color:#1e2433"/>
+                <stop offset="100%" style="stop-color:#0d1117"/>
+            </linearGradient>
+            <linearGradient id="glow" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" style="stop-color:#58a6ff"/>
+                <stop offset="50%" style="stop-color:#388bfd"/>
+                <stop offset="100%" style="stop-color:#58a6ff"/>
+            </linearGradient>
+        </defs>
+        <rect width="1024" height="1024" rx="230" fill="url(#bg)"/>
+        <path d="M340 260 L340 740 L500 740 C660 740 740 640 740 500 C740 360 660 260 500 260 Z"
+              fill="none" stroke="url(#glow)" stroke-width="64" stroke-linejoin="round" stroke-linecap="round"/>
+        <g transform="translate(512, 860)">
+            <circle cx="-60" cy="0" r="14" fill="#58a6ff" opacity="0.7"/>
+            <circle cx="0" cy="0" r="14" fill="#3fb950" opacity="0.9"/>
+            <circle cx="60" cy="0" r="14" fill="#bc8cff" opacity="0.7"/>
+        </g>
+    </svg>
+    <span class="nav-title">DevDock</span>
+    <div class="nav-links">
+        <a href="#features">Features</a>
+        <a href="#claude">Claude</a>
+        <a href="#agents">Agents</a>
+        <a href="#pipeline">Pipeline</a>
+    </div>
+</nav>
+
+<!-- Hero -->
+<section class="hero">
+    <svg class="hero-icon" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+            <linearGradient id="bg2" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" style="stop-color:#1e2433"/>
+                <stop offset="100%" style="stop-color:#0d1117"/>
+            </linearGradient>
+            <linearGradient id="glow2" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" style="stop-color:#58a6ff"/>
+                <stop offset="50%" style="stop-color:#388bfd"/>
+                <stop offset="100%" style="stop-color:#58a6ff"/>
+            </linearGradient>
+        </defs>
+        <rect width="1024" height="1024" rx="230" fill="url(#bg2)"/>
+        <path d="M340 260 L340 740 L500 740 C660 740 740 640 740 500 C740 360 660 260 500 260 Z"
+              fill="none" stroke="url(#glow2)" stroke-width="64" stroke-linejoin="round" stroke-linecap="round"/>
+        <g transform="translate(512, 860)">
+            <circle cx="-60" cy="0" r="14" fill="#58a6ff" opacity="0.7"/>
+            <circle cx="0" cy="0" r="14" fill="#3fb950" opacity="0.9"/>
+            <circle cx="60" cy="0" r="14" fill="#bc8cff" opacity="0.7"/>
+        </g>
+    </svg>
+    <h1>Your entire dev environment.<br><span class="accent">One dock.</span></h1>
+    <p class="subtitle">
+        DevDock is a macOS app that manages all your local projects, embeds Claude Code sessions,
+        runs autonomous coding pipelines, and monitors your AI agents — all from one unified dashboard.
+    </p>
+    <div class="hero-badges">
+        <span class="badge"><span class="badge-dot blue"></span> Electron + React</span>
+        <span class="badge"><span class="badge-dot green"></span> 90+ Projects</span>
+        <span class="badge"><span class="badge-dot purple"></span> Claude Code Built-in</span>
+        <span class="badge"><span class="badge-dot orange"></span> macOS Native</span>
+    </div>
+</section>
+
+<!-- App Screenshot Mockup -->
+<div class="screenshot-container">
+    <div class="app-mockup">
+        <div class="mockup-titlebar">
+            <span class="mockup-dot r"></span>
+            <span class="mockup-dot y"></span>
+            <span class="mockup-dot g"></span>
+            <span class="mockup-title">DevDock</span>
+        </div>
+        <div class="mockup-tabs">
+            <div class="mockup-tab active">Launchpad <span style="color:#3fb950;font-size:10px;margin-left:4px">3</span></div>
+            <div class="mockup-tab">All Folders</div>
+            <div class="mockup-tab">Claude <span style="color:#d29922;font-size:10px;margin-left:4px">2</span></div>
+            <div class="mockup-tab">Agents</div>
+        </div>
+        <div class="mockup-body">
+            <div class="mockup-sidebar">
+                <div class="mockup-sidebar-title">Filter</div>
+                <div class="mockup-sidebar-item active"><span>All Projects</span><span>94</span></div>
+                <div class="mockup-sidebar-item"><span>Running</span><span style="color:#3fb950">3</span></div>
+                <div class="mockup-sidebar-item"><span>Running (System)</span><span style="color:#d29922">2</span></div>
+                <div class="mockup-sidebar-item"><span>No Command</span><span>8</span></div>
+                <div class="mockup-sidebar-title" style="margin-top:8px">Tags</div>
+                <div class="mockup-sidebar-item"><span>billing</span><span>12</span></div>
+                <div class="mockup-sidebar-item"><span>frontend</span><span>18</span></div>
+                <div class="mockup-sidebar-item"><span>infra</span><span>6</span></div>
+                <div class="mockup-sidebar-item"><span>mobile</span><span>4</span></div>
+            </div>
+            <div class="mockup-grid">
+                <div class="mockup-card">
+                    <div class="mockup-card-header">
+                        <span class="mockup-card-dot" style="background:#3fb950;box-shadow:0 0 4px #3fb950"></span>
+                        <span class="mockup-card-name">premium-billing</span>
+                    </div>
+                    <div class="mockup-card-desc">Main billing service</div>
+                    <div class="mockup-card-tags">
+                        <span class="mockup-tag">React</span>
+                        <span class="mockup-tag purple">TypeScript</span>
+                        <span class="mockup-tag green">:3000</span>
+                    </div>
+                </div>
+                <div class="mockup-card">
+                    <div class="mockup-card-header">
+                        <span class="mockup-card-dot" style="background:#3fb950;box-shadow:0 0 4px #3fb950"></span>
+                        <span class="mockup-card-name">payment-gateway</span>
+                    </div>
+                    <div class="mockup-card-desc">Payment processing API</div>
+                    <div class="mockup-card-tags">
+                        <span class="mockup-tag">Node.js</span>
+                        <span class="mockup-tag green">:4000</span>
+                    </div>
+                </div>
+                <div class="mockup-card">
+                    <div class="mockup-card-header">
+                        <span class="mockup-card-dot" style="background:#6e7681"></span>
+                        <span class="mockup-card-name">auth-service</span>
+                    </div>
+                    <div class="mockup-card-desc">OAuth2 provider</div>
+                    <div class="mockup-card-tags">
+                        <span class="mockup-tag">Scala</span>
+                        <span class="mockup-tag purple">Akka</span>
+                    </div>
+                </div>
+                <div class="mockup-card">
+                    <div class="mockup-card-header">
+                        <span class="mockup-card-dot" style="background:#d29922;box-shadow:0 0 4px #d29922"></span>
+                        <span class="mockup-card-name">sentry-health</span>
+                    </div>
+                    <div class="mockup-card-desc">Error monitoring dashboard</div>
+                    <div class="mockup-card-tags">
+                        <span class="mockup-tag">Go</span>
+                        <span class="mockup-tag green">:8080</span>
+                    </div>
+                </div>
+                <div class="mockup-card">
+                    <div class="mockup-card-header">
+                        <span class="mockup-card-dot" style="background:#3fb950;box-shadow:0 0 4px #3fb950"></span>
+                        <span class="mockup-card-name">mobile-app</span>
+                    </div>
+                    <div class="mockup-card-desc">React Native client</div>
+                    <div class="mockup-card-tags">
+                        <span class="mockup-tag">React Native</span>
+                        <span class="mockup-tag purple">iOS</span>
+                    </div>
+                </div>
+                <div class="mockup-card">
+                    <div class="mockup-card-header">
+                        <span class="mockup-card-dot" style="background:#6e7681"></span>
+                        <span class="mockup-card-name">design-system</span>
+                    </div>
+                    <div class="mockup-card-desc">Shared UI components</div>
+                    <div class="mockup-card-tags">
+                        <span class="mockup-tag">React</span>
+                        <span class="mockup-tag">Storybook</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Features -->
+<section class="features" id="features">
+    <h2 class="features-title">Everything you need. Nothing you don't.</h2>
+    <div class="features-grid">
+        <div class="feature-card">
+            <div class="feature-icon blue">&#x1F680;</div>
+            <h3>Project Launchpad</h3>
+            <p>Auto-scans your workspace and detects projects across Node.js, Scala, Go, Rust, Python, Ruby, and more. Start, stop, and monitor dev servers with one click. See which ports are in use system-wide.</p>
+        </div>
+        <div class="feature-card" id="claude">
+            <div class="feature-icon purple">&#x1F4AC;</div>
+            <h3>Embedded Claude Sessions</h3>
+            <p>Launch Claude Code directly inside DevDock with full terminal emulation. Supports git worktrees for isolated changes, session resume, image paste, clickable links, and a "waiting for input" indicator.</p>
+        </div>
+        <div class="feature-card" id="pipeline">
+            <div class="feature-icon green">&#x2699;&#xFE0F;</div>
+            <h3>Autonomous Pipeline</h3>
+            <p>Describe a task and let the pipeline plan, implement, validate, and review it automatically. Each stage runs in isolated git worktrees. Failed validations trigger automatic retries with feedback.</p>
+        </div>
+        <div class="feature-card" id="agents">
+            <div class="feature-icon orange">&#x1F916;</div>
+            <h3>Agent Monitoring</h3>
+            <p>Auto-discovers Claude agents from LaunchAgent plists. Shows real-time status, schedules, run history, and logs. Trigger manual runs and view output — all from DevDock.</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon blue">&#x1F310;</div>
+            <h3>Built-in Browser</h3>
+            <p>Claude can control a real browser window for visual testing. Navigate, screenshot, click, type, and inspect pages — all via simple CLI commands injected automatically into each session.</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon purple">&#x1F4C2;</div>
+            <h3>File Explorer & Search</h3>
+            <p>Browse project files, view syntax-highlighted code, search across codebases, and inspect git diffs — all in a side panel next to your Claude session. No context switching needed.</p>
+        </div>
+    </div>
+</section>
+
+<!-- Claude Terminal Mockup -->
+<section class="terminal-section">
+    <h2 class="terminal-section-title">Claude, built right in</h2>
+    <p class="terminal-section-sub">Full terminal sessions with worktree isolation, session resume, and smart notifications</p>
+    <div class="terminal-mockup">
+        <div class="terminal-bar">
+            <span class="mockup-dot r" style="width:10px;height:10px"></span>
+            <span class="mockup-dot y" style="width:10px;height:10px"></span>
+            <span class="mockup-dot g" style="width:10px;height:10px"></span>
+            <div style="display:flex;gap:4px;margin-left:16px">
+                <span class="terminal-bar-tab active">premium-billing</span>
+                <span class="terminal-bar-tab">auth-service <span class="tab-dot"></span></span>
+                <span class="terminal-bar-tab">mobile-app</span>
+            </div>
+        </div>
+        <div class="terminal-content">
+            <div><span class="prompt">claude&gt;</span> <span class="output">Add input validation to the checkout form with proper error messages</span></div>
+            <div>&nbsp;</div>
+            <div><span class="claude">Claude</span> <span class="output">I'll add input validation to the checkout form. Let me examine the current implementation first.</span></div>
+            <div>&nbsp;</div>
+            <div><span class="output">  Reading src/components/CheckoutForm.tsx...</span></div>
+            <div><span class="output">  Reading src/utils/validators.ts...</span></div>
+            <div>&nbsp;</div>
+            <div><span class="success">  Created src/hooks/useFormValidation.ts</span></div>
+            <div><span class="success">  Modified src/components/CheckoutForm.tsx (+42 lines)</span></div>
+            <div><span class="success">  Modified src/utils/validators.ts (+18 lines)</span></div>
+            <div>&nbsp;</div>
+            <div><span class="claude">Claude</span> <span class="output">Done. Added real-time validation for email, card number (Luhn check), expiry date, and CVV.</span></div>
+            <div><span class="output">  All existing tests pass. Run </span><span class="success">npm test</span><span class="output"> to verify.</span></div>
+        </div>
+    </div>
+</section>
+
+<!-- Pipeline Section -->
+<section class="terminal-section">
+    <h2 class="terminal-section-title">Autonomous Pipeline</h2>
+    <p class="terminal-section-sub">Plan. Implement. Validate. Review. Automatically.</p>
+    <div class="pipeline-dots">
+        <div class="pipeline-dot done">&#10003;</div>
+        <div class="pipeline-line done"></div>
+        <div class="pipeline-dot done">&#10003;</div>
+        <div class="pipeline-line done"></div>
+        <div class="pipeline-dot active">3</div>
+        <div class="pipeline-line"></div>
+        <div class="pipeline-dot">4</div>
+    </div>
+    <div class="pipeline-labels">
+        <span>Plan</span>
+        <span>Implement</span>
+        <span>Validate</span>
+        <span>Review</span>
+    </div>
+</section>
+
+<!-- Agent Section -->
+<section class="agent-section">
+    <h2 class="terminal-section-title">Agent Dashboard</h2>
+    <p class="terminal-section-sub">Monitor all your Claude agents from one place</p>
+    <div class="agent-cards">
+        <div class="agent-card-mock">
+            <div class="agent-header">
+                <span class="agent-dot-mock on"></span>
+                <span class="agent-name-mock">PR Monitor</span>
+                <span class="agent-badge-mock running">Connected</span>
+            </div>
+            <div class="agent-desc-mock">Reviews PRs via Slack Socket Mode</div>
+            <div class="agent-meta-mock">147 PRs reviewed &middot; Last run: 2m ago</div>
+        </div>
+        <div class="agent-card-mock">
+            <div class="agent-header">
+                <span class="agent-dot-mock off"></span>
+                <span class="agent-name-mock">Daily Digest</span>
+                <span class="agent-badge-mock idle">Idle</span>
+            </div>
+            <div class="agent-desc-mock">Summarizes merged PRs at 9 AM</div>
+            <div class="agent-meta-mock">23 digests sent &middot; Next: 09:00</div>
+        </div>
+        <div class="agent-card-mock">
+            <div class="agent-header">
+                <span class="agent-dot-mock on"></span>
+                <span class="agent-name-mock">Otto</span>
+                <span class="agent-badge-mock running">Connected</span>
+            </div>
+            <div class="agent-desc-mock">General-purpose Slack agent</div>
+            <div class="agent-meta-mock">12 active sessions &middot; $4.20 cost</div>
+        </div>
+    </div>
+</section>
+
+<!-- Tech Stack -->
+<section class="tech-section">
+    <h2 class="features-title">Built With</h2>
+    <div class="tech-grid">
+        <span class="tech-item">Electron</span>
+        <span class="tech-item">React</span>
+        <span class="tech-item">TypeScript</span>
+        <span class="tech-item">xterm.js</span>
+        <span class="tech-item">node-pty</span>
+        <span class="tech-item">Claude Code CLI</span>
+        <span class="tech-item">Vite</span>
+        <span class="tech-item">Git Worktrees</span>
+    </div>
+</section>
+
+<!-- Footer -->
+<footer class="footer">
+    <p>DevDock &mdash; Built by <a href="https://github.com/shayk">shayk</a> with Claude Code</p>
+    <p style="margin-top:8px">macOS only &middot; Requires Claude Code CLI</p>
+</footer>
+
+</body>
+</html>
